@@ -11,7 +11,7 @@ AutoPID myPID(&temp_in, &setPoint, &outputVal, OUTPUT_MIN, OUTPUT_MAX, KP, KI, K
 
 void setup() {
 
-  Serial.begin(115200);
+  // Serial.begin(115200);
   pinMode(SIGNAL_LED, OUTPUT);
   digitalWrite(SIGNAL_LED, signal_led);
   
@@ -29,6 +29,10 @@ void setup() {
 
   pinMode(FAN_PWM, OUTPUT);
   analogWrite(FAN_PWM, fanSpeed);
+
+  pinMode(FAN_RPM, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(FAN_RPM), fanRpmInt, RISING);
+
   
   sensors1.begin();
   sensors2.begin();
@@ -36,11 +40,16 @@ void setup() {
 
   ads.begin();
   
+  pinMode(ISET2_PWM, OUTPUT);
+  pinMode(ISET1_PWM, OUTPUT);
   InitTimersSafe(); 
-  SetPinFrequencySafe(ISET1_PWM, frequency);
-  SetPinFrequencySafe(ISET2_PWM, frequency);
+  bool succ = SetPinFrequencySafe(ISET2_PWM, frequency);
+  // Serial.println(succ);
+  succ = SetPinFrequencySafe(ISET1_PWM, frequency);
+  // Serial.println(succ);
+  
+  pwmWrite(ISET2_PWM, PRECHARGE_TERM);
   pwmWrite(ISET1_PWM, CHARGE_0A);
-  pwmWrite(ISET2_PWM, CHARGE_0A);
 
 
   pinMode(POWER_SWITCH_SENSE, INPUT);
@@ -51,7 +60,12 @@ void setup() {
   myPID.setBangBang(0.5, 0.5);
   //set PID update interval to 4000ms
   myPID.setTimeStep(TEMP_READ_INTERVAL);
-  
+
+  nh.getHardware()->setBaud(115200);
+  nh.initNode();
+  nh.advertise(pub_ups);
+  nh.subscribe(sub_charge_current);
+
 
   lastmillis1Hz = millis();
   lastmillis0_1Hz = lastmillis1Hz;
@@ -70,7 +84,10 @@ void loop() {
 
   if ((millis() - lastmillis1Hz) >= 1000){
     lastmillis1Hz = millis();
-    printData();   
+    fan_rpm = (fan_rpm_count / 2) * 60;
+    fan_rpm_count = 0;
+    // printData();   
+    rosMsgUps();
   }
 
   if ((millis() - lastmillis0_1Hz) >= TEMP_READ_INTERVAL){
@@ -81,6 +98,7 @@ void loop() {
     analogWrite(FAN_PWM, abs(outputVal));
 
   }
+  nh.spinOnce();
    
 }
 
@@ -101,6 +119,7 @@ void printData() {
   Serial.print("Online:  "); Serial.print(online); Serial.println("   0=offline 1=online");
   Serial.print("Charge state:  "); Serial.print(charge_state); Serial.println("   0=init, 1=charged, 2=charging, 3=discharging, 4=low, 5=empty");
   Serial.print("fanPID output:  "); Serial.print(outputVal); Serial.println("   ");
+  Serial.print("fan rpm:  "); Serial.print(fan_rpm); Serial.println("   ");
 }
 
 
@@ -172,11 +191,11 @@ void getAdcData() {
   
   input_voltage  = (analogRead(VIN_ADC))*(30.0/1023.0);
   bat_voltage  = (analogRead(BATTERY_VSENSE_ADC))*(24.193/1023.0);
-  charge_current = ((ads.computeVolts(ads.readADC_SingleEnded(0)))/(0.005*23))-0.23;
+  charge_current = ((ads.computeVolts(ads.readADC_SingleEnded(0)))/(0.005*bat_voltage))-0.00; // -0.23
   if (!online) {
     charge_current = 0;
   }
-  discharge_current = (ads.computeVolts(ads.readADC_SingleEnded(1)))/(0.005*bat_voltage)-0.05;
+  discharge_current = (ads.computeVolts(ads.readADC_SingleEnded(1)))/(0.005*bat_voltage)-0.00; // -0.05
   output19v_voltage = (ads.computeVolts(ads.readADC_SingleEnded(3)))*(24.0/5.0);
   if (output19v_voltage > 3){
     output19v_current = (ads.computeVolts(ads.readADC_SingleEnded(2)))/(0.005*output19v_voltage);
@@ -297,8 +316,8 @@ void turnOn() {
   digitalWrite(OUT19V_SWITCH, output19_switch);
   digitalWrite(OUT19V_DC_DC_EN, dc19_enable);
   digitalWrite(BATTERY_DISCHARGE_SWITCH, battery_discharge_switch);
-  battery_charge_switch = 0;  // 0=off , 1=on
-  digitalWrite(BATTERY_CHARGE_SWITCH, battery_charge_switch);
+  // battery_charge_switch = 0;  // 0=off , 1=on
+  // digitalWrite(BATTERY_CHARGE_SWITCH, battery_charge_switch);
 }
 
 
@@ -331,6 +350,7 @@ void setChargeState() {
       battery_charge_switch = 1;  // 0=off , 1=on
       digitalWrite(BATTERY_CHARGE_SWITCH, battery_charge_switch);
       charge_state = 2; // 0=init, 1=charged, 2=charging, 3=discharging, 4=low, 5=empty
+      //pwmWrite(ISET2_PWM, PRECHARGE_TERM);
       if (power_module_state == 3) {
         power_module_state = 2;
       }
@@ -339,7 +359,7 @@ void setChargeState() {
       if (battery_capacity == 100 && charge_current <= 0) {  // if is online, charging and charge current i bellow cut then stop charging
         pwmWrite(ISET1_PWM, charge_current_setpoint);
         battery_charge_switch = 0;  // 0=off , 1=on
-        digitalWrite(BATTERY_CHARGE_SWITCH, CHARGE_0A);
+        digitalWrite(BATTERY_CHARGE_SWITCH, battery_charge_switch);
         charge_state = 1; // 0=init, 1=charged, 2=charging, 3=discharging, 4=low, 5=empty
         if (power_module_state == 2) {
           power_module_state = 3;
@@ -370,5 +390,112 @@ void batteryEmpty() {
       standBy();
     }
     
+  }
+}
+
+void fanRpmInt() {
+  fan_rpm_count ++;
+}
+
+void rosMsgUps()
+{
+
+    float bat_current;
+    float in_current_avg;
+    float pwr_bat = 0.0;
+    float pwr_19v = 0.0;
+    float pwr_in = 0.0;
+    
+    if (online){
+      vitulus_ups_msg.ups_status = "online";
+      
+
+      if (charge_current > 0.0) {
+        pwr_bat = bat_voltage * charge_current;
+      }
+
+      if (output19v_current > 0.0) {
+        pwr_19v = output19v_voltage * output19v_current;
+      }
+
+      pwr_in = pwr_19v + pwr_bat;
+      if (pwr_in > 0.0) {
+        in_current_avg = pwr_in / input_voltage;
+      }else {
+        in_current_avg = 0.0;
+      }
+      
+
+      
+    }else{
+      vitulus_ups_msg.ups_status = "offline";
+      in_current_avg = 0.0;
+    }
+    // 0=init, 1=charged, 2=charging, 3=discharging, 4=low, 5=empty
+    if (charge_state == 0){
+      vitulus_ups_msg.battery_status = "Init";
+    }
+    if (charge_state == 1){
+      vitulus_ups_msg.battery_status = "charged";
+      bat_current = 0;
+    }
+    if (charge_state == 2){
+      vitulus_ups_msg.battery_status = "charging";
+      bat_current = charge_current;
+    }
+    if (charge_state == 3){
+      vitulus_ups_msg.battery_status = "discharging";
+      bat_current = discharge_current*-1;
+    }
+    if (charge_state == 4){
+      vitulus_ups_msg.battery_status = "low";
+      bat_current = discharge_current*-1;
+    }
+    if (charge_state == 5){
+      vitulus_ups_msg.battery_status = "empty";
+      bat_current = discharge_current*-1;
+    }
+
+   
+    
+    vitulus_ups_msg.driver = "Vitulus_UPS_v0.2";
+    vitulus_ups_msg.battery_voltage = int (bat_voltage*1000);
+    vitulus_ups_msg.battery_current = int (bat_current*1000);
+    vitulus_ups_msg.input_voltage = int (input_voltage*1000);
+    vitulus_ups_msg.input_current = int (in_current_avg*1000);
+    vitulus_ups_msg.output_voltage = int (output19v_voltage*1000);
+    vitulus_ups_msg.output_current = int (output19v_current*1000);
+    vitulus_ups_msg.battery_capacity = int (battery_capacity);
+    vitulus_ups_msg.cell1_voltage = int (charge_state);
+    vitulus_ups_msg.cell2_voltage = int (pwr_in);
+    vitulus_ups_msg.cell3_voltage = int (0);
+    vitulus_ups_msg.cell4_voltage = int (0);
+    vitulus_ups_msg.cell5_voltage = int (0);
+    vitulus_ups_msg.cell6_voltage = int (0);
+    pub_ups.publish(&vitulus_ups_msg);
+
+
+    
+}
+
+void setChargeCurrent(const std_msgs::Int8& charge_current_msg) {
+
+  if (charge_current_msg.data == 0){
+    charge_current_setpoint = CHARGE_0A;
+  }
+  if (charge_current_msg.data == 1){
+    charge_current_setpoint = CHARGE_1A;
+  }
+  if (charge_current_msg.data == 2){
+    charge_current_setpoint = CHARGE_2A;
+  }
+  if (charge_current_msg.data == 4){
+    charge_current_setpoint = CHARGE_4A;
+  }
+  if (charge_current_msg.data == 6){
+    charge_current_setpoint = CHARGE_6A;
+  }
+  if (charge_current_msg.data == 10){
+    charge_current_setpoint = CHARGE_FULL;
   }
 }

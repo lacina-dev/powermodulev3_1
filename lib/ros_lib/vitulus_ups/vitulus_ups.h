@@ -1,5 +1,5 @@
-#ifndef _ROS_vitulus_bringup_vitulus_ups_h
-#define _ROS_vitulus_bringup_vitulus_ups_h
+#ifndef _ROS_vitulus_ups_vitulus_ups_h
+#define _ROS_vitulus_ups_vitulus_ups_h
 
 #include <stdint.h>
 #include <string.h>
@@ -7,7 +7,7 @@
 #include "ros/msg.h"
 #include "std_msgs/Header.h"
 
-namespace vitulus_bringup
+namespace vitulus_ups
 {
 
   class vitulus_ups : public ros::Msg
@@ -360,7 +360,7 @@ namespace vitulus_bringup
      return offset;
     }
 
-    const char * getType(){ return "vitulus_bringup/vitulus_ups"; };
+    const char * getType(){ return "vitulus_ups/vitulus_ups"; };
     const char * getMD5(){ return "b62755b021b0543fc5e4775717df5161"; };
 
   };
