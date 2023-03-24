@@ -23,13 +23,13 @@
 #define KI .0003
 #define KD 0
 
-double temperature, setPoint, outputVal;
+double temperature, temp_setpoint, outputVal;
 
 OneWire oneWire(TEMP_PROBE_PIN);
 DallasTemperature temperatureSensors(&oneWire);
 
 //input/output variables passed by reference, so they are updated automatically
-AutoPID myPID(&temperature, &setPoint, &outputVal, OUTPUT_MIN, OUTPUT_MAX, KP, KI, KD);
+AutoPID tempPID(&temperature, &temp_setpoint, &outputVal, OUTPUT_MIN, OUTPUT_MAX, KP, KI, KD);
 
 unsigned long lastTempUpdate; //tracks clock time of last temp update
 
@@ -56,18 +56,18 @@ void setup() {
   while (!updateTemperature()) {} //wait until temp sensor updated
 
   //if temperature is more than 4 degrees below or above setpoint, OUTPUT will be set to min or max respectively
-  myPID.setBangBang(4);
+  tempPID.setBangBang(4);
   //set PID update interval to 4000ms
-  myPID.setTimeStep(4000);
+  tempPID.setTimeStep(4000);
 
 }//void setup
 
 
 void loop() {
   updateTemperature();
-  setPoint = analogRead(POT_PIN);
-  myPID.run(); //call every loop, updates automatically at certain time interval
+  temp_setpoint = analogRead(POT_PIN);
+  tempPID.run(); //call every loop, updates automatically at certain time interval
   analogWrite(OUTPUT_PIN, outputVal);
-  digitalWrite(LED_PIN, myPID.atSetPoint(1)); //light up LED when we're at setpoint +-1 degree
+  digitalWrite(LED_PIN, tempPID.atSetPoint(1)); //light up LED when we're at setpoint +-1 degree
 
 }//void loop

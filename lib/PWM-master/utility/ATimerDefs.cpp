@@ -274,7 +274,7 @@ void InitTimers()
 void InitTimersSafe()
 {
 	Timer1_Initialize();
-	Timer2_Initialize();
+	// Timer2_Initialize();
 	Timer3_Initialize();
 	Timer4_Initialize();
 	Timer5_Initialize();

@@ -62,7 +62,7 @@ namespace turtlebot3_msgs
     {
     }
 
-    virtual int serialize(unsigned char *outbuffer) const
+    virtual int serialize(unsigned char *outbuffer) const override
     {
       int offset = 0;
       offset += this->header.serialize(outbuffer + offset);
@@ -142,7 +142,7 @@ namespace turtlebot3_msgs
       return offset;
     }
 
-    virtual int deserialize(unsigned char *inbuffer)
+    virtual int deserialize(unsigned char *inbuffer) override
     {
       int offset = 0;
       offset += this->header.deserialize(inbuffer + offset);
@@ -229,8 +229,8 @@ namespace turtlebot3_msgs
      return offset;
     }
 
-    const char * getType(){ return "turtlebot3_msgs/SensorState"; };
-    const char * getMD5(){ return "7250c1dc0b61c4190e78f528f599285f"; };
+    virtual const char * getType() override { return "turtlebot3_msgs/SensorState"; };
+    virtual const char * getMD5() override { return "7250c1dc0b61c4190e78f528f599285f"; };
 
   };
 

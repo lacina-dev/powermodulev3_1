@@ -75,7 +75,7 @@ namespace vitulus_ups
     {
     }
 
-    virtual int serialize(unsigned char *outbuffer) const
+    virtual int serialize(unsigned char *outbuffer) const override
     {
       int offset = 0;
       offset += this->header.serialize(outbuffer + offset);
@@ -205,7 +205,7 @@ namespace vitulus_ups
       return offset;
     }
 
-    virtual int deserialize(unsigned char *inbuffer)
+    virtual int deserialize(unsigned char *inbuffer) override
     {
       int offset = 0;
       offset += this->header.deserialize(inbuffer + offset);
@@ -360,8 +360,8 @@ namespace vitulus_ups
      return offset;
     }
 
-    const char * getType(){ return "vitulus_ups/vitulus_ups"; };
-    const char * getMD5(){ return "b62755b021b0543fc5e4775717df5161"; };
+    virtual const char * getType() override { return "vitulus_ups/vitulus_ups"; };
+    virtual const char * getMD5() override { return "b62755b021b0543fc5e4775717df5161"; };
 
   };
 

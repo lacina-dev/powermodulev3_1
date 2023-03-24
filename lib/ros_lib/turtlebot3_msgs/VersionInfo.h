@@ -26,7 +26,7 @@ namespace turtlebot3_msgs
     {
     }
 
-    virtual int serialize(unsigned char *outbuffer) const
+    virtual int serialize(unsigned char *outbuffer) const override
     {
       int offset = 0;
       uint32_t length_hardware = strlen(this->hardware);
@@ -47,7 +47,7 @@ namespace turtlebot3_msgs
       return offset;
     }
 
-    virtual int deserialize(unsigned char *inbuffer)
+    virtual int deserialize(unsigned char *inbuffer) override
     {
       int offset = 0;
       uint32_t length_hardware;
@@ -80,8 +80,8 @@ namespace turtlebot3_msgs
      return offset;
     }
 
-    const char * getType(){ return "turtlebot3_msgs/VersionInfo"; };
-    const char * getMD5(){ return "43e0361461af2970a33107409403ef3c"; };
+    virtual const char * getType() override { return "turtlebot3_msgs/VersionInfo"; };
+    virtual const char * getMD5() override { return "43e0361461af2970a33107409403ef3c"; };
 
   };
 

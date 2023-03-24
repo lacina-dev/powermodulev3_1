@@ -32,7 +32,7 @@ This example runs on mega and uno.
 #include <PWM.h>
 
 //use pin 11 on the mega for this example to work
-int led = 9; // the pin that the LED is attached to
+int led = 45; // the pin that the LED is attached to
 
 void setup()
 {

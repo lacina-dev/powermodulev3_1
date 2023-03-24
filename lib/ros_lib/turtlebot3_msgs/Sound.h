@@ -26,7 +26,7 @@ namespace turtlebot3_msgs
     {
     }
 
-    virtual int serialize(unsigned char *outbuffer) const
+    virtual int serialize(unsigned char *outbuffer) const override
     {
       int offset = 0;
       *(outbuffer + offset + 0) = (this->value >> (8 * 0)) & 0xFF;
@@ -34,7 +34,7 @@ namespace turtlebot3_msgs
       return offset;
     }
 
-    virtual int deserialize(unsigned char *inbuffer)
+    virtual int deserialize(unsigned char *inbuffer) override
     {
       int offset = 0;
       this->value =  ((uint8_t) (*(inbuffer + offset)));
@@ -42,8 +42,8 @@ namespace turtlebot3_msgs
      return offset;
     }
 
-    const char * getType(){ return "turtlebot3_msgs/Sound"; };
-    const char * getMD5(){ return "e1f8c7f8a9a61383b5734fbdeca2f99a"; };
+    virtual const char * getType() override { return "turtlebot3_msgs/Sound"; };
+    virtual const char * getMD5() override { return "e1f8c7f8a9a61383b5734fbdeca2f99a"; };
 
   };
 
