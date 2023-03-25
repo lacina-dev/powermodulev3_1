@@ -20,7 +20,6 @@ Power module control 6S Li-ion battery charging, measure voltages and currents, 
 
 ----------
 
-
 Power module assembled
 
 ![Power module assembled](DSC03553.JPG)
