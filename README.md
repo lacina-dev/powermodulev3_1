@@ -1,4 +1,4 @@
-# VITULUS power module 
+# Software for VITULUS power module 
 
 VSC project program files for Arduino Mega embed in VITULUS mobile robot’s power module.
 
