@@ -234,8 +234,6 @@ int temp_ext_setpoint_addr =  precharge_current_setpoint_standby_addr + sizeof(i
 
 
 float get_amps(float, float);
-bool switch_bool(bool);
-
 void get_ADS();
 void get_bq24610();
 void get_voltage();
@@ -257,18 +255,8 @@ void set_standby();
 void set_shutdown();
 void set_charge_current();
 void check_sleep();
-
 void printData();
-
-
-void getTemp();
-void powerButton();
-void getAdcData();
-void signalLed();
 void batteryCapacity();
-void getOnLine();
-void setChargeState();
-void batteryEmpty();
 
 
 void rosMsgUps();

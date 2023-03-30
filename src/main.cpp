@@ -314,9 +314,9 @@ void play_melody()
       melody_playing = true;
       melody = id_get_melody(melody_tmp);
       shift_buffer();
-      nh.loginfo("********** play_melody *************");
+      // nh.loginfo("********** play_melody *************");
       char buffer[80];
-      sprintf(buffer, "DEBUG play_melody nr.: %d ", melody.melody_name);
+      // sprintf(buffer, "DEBUG play_melody nr.: %d ", melody.melody_name);
       nh.loginfo(buffer);
     }
   }
@@ -343,23 +343,6 @@ void play_melody()
 
   }
   
-}
-
-/*############################################################################
-#           Invert bool value - REPLACE WITH !
-############################################################################*/
-bool switch_bool(bool val)
-{
-  bool output;
-  if (val)
-  {
-    output = 0;
-  }
-  else
-  {
-    output = 1;
-  }
-  return output;
 }
 
 /*############################################################################
@@ -424,9 +407,9 @@ void get_ADS()
 ############################################################################*/
 void get_bq24610()
 {
-  stat_1 = switch_bool(digitalRead(STAT_1));
-  stat_2 = switch_bool(digitalRead(STAT_2));
-  pg = switch_bool(digitalRead(PG));
+  stat_1 = !digitalRead(STAT_1);
+  stat_2 = !digitalRead(STAT_2);
+  pg = !digitalRead(PG);
 }
 
 /*############################################################################
@@ -1173,7 +1156,7 @@ void rosMsgPowerStatus()
   power_status_msg.bat_out_switch = battery_output_switch;
   power_status_msg.motor_out_switch = motors_output_switch;
   power_status_msg.out19v_switch = output19_switch;
-  power_status_msg.enable19v_switch = switch_bool(dc19_enable);
+  power_status_msg.enable19v_switch = !dc19_enable;
   power_status_msg.charge_current_setpoint_run = int(float(charge_current_setpoint_running) / 0.01063 / 1.23);
   power_status_msg.charge_current_setpoint_standby = int(float(charge_current_setpoint_standby) / 0.01063 / 1.23);
   power_status_msg.precharge_current_setpoint_run = int(float(precharge_current_setpoint_running) / 0.05355) - 300;
