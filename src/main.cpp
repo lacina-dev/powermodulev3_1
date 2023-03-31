@@ -1452,7 +1452,7 @@ void set_sleep_until_charged(const std_msgs::Bool &msg)
 }
 
 /*############################################################################
-#                 Set timeout in [ms] to shutdown when on battery and do nothing
+#                 Set timeout in [ms] to shut down when on battery and do nothing
 ############################################################################*/
 void set_standby_timeout_discharging(const std_msgs::UInt64 &msg)
 {
