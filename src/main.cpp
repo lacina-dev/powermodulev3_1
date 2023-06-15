@@ -38,6 +38,7 @@ void setup()
   nh.subscribe(sub_set_sleep_wait_before_standby);
   nh.subscribe(sub_set_sleep_wait_charged_offset);
   nh.subscribe(sub_set_temp2_setpoint);
+  nh.subscribe(sub_play_melody);
 
   // EEPROM First run check
   if (EEPROM.get(check_eeprom_addr, check_eeprom) != 1)
@@ -315,9 +316,9 @@ void play_melody()
       melody = id_get_melody(melody_tmp);
       shift_buffer();
       // nh.loginfo("********** play_melody *************");
-      char buffer[80];
+      // char buffer[80];
       // sprintf(buffer, "DEBUG play_melody nr.: %d ", melody.melody_name);
-      nh.loginfo(buffer);
+      // nh.loginfo(buffer);
     }
   }
 
@@ -1502,6 +1503,17 @@ void set_sleep_wait_charged_offset(const std_msgs::UInt64 &msg)
     sleep_wait_charged_offset_millis = msg.data;
     nh.loginfo("Sleep time ofset to wake up after charged was set.");
     EEPROM.put(sleep_wait_charged_offset_millis_addr, sleep_wait_charged_offset_millis);// store value in eeprom
+  }
+}
+
+/*############################################################################
+#                 Play melody by id.
+############################################################################*/
+void play_melody(const std_msgs::Int16 &msg)
+{
+  if (msg.data)
+  {
+    add_melody(msg.data);
   }
 }
 

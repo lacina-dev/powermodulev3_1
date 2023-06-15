@@ -280,6 +280,7 @@ void set_sleep_time(const std_msgs::UInt64& set_sleep_time_msg);
 void set_sleep_wait_before_standby(const std_msgs::UInt64& set_sleep_wait_before_standby_msg);
 void set_sleep_wait_charged_offset(const std_msgs::UInt64& set_sleep_wait_charged_offset_msg);
 void set_temp2_setpoint(const std_msgs::Float64& set_temp2_setpoint_msg);
+void play_melody(const std_msgs::Int16& play_melody_msg);
 
 ros::NodeHandle nh;
 
@@ -308,4 +309,5 @@ ros::Subscriber<std_msgs::UInt64> sub_set_sleep_time("set_sleep_time", set_sleep
 ros::Subscriber<std_msgs::UInt64> sub_set_sleep_wait_before_standby("set_sleep_wait_before_standby", set_sleep_wait_before_standby );
 ros::Subscriber<std_msgs::UInt64> sub_set_sleep_wait_charged_offset("set_sleep_wait_charged_offset", set_sleep_wait_charged_offset );
 ros::Subscriber<std_msgs::Float64> sub_set_temp2_setpoint("set_temp2_setpoint", set_temp2_setpoint );
+ros::Subscriber<std_msgs::Int16> sub_play_melody("play_melody", play_melody );
 
