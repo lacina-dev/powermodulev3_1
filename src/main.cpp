@@ -906,7 +906,7 @@ void check_sleep()
     // If timeout for the robot's self shutdown exceeded. Go to stanby and sleep.
     if ((millis() - sleep_wait_before_standby_timer) >= sleep_wait_before_standby_millis && (millis() - sleep_time_timer) <= sleep_wait_before_standby_millis + 300)
     {
-      if (power_module_status == STANDBY){
+      if (power_module_status == RUNNING){
         set_standby();
         nh.loginfo("Sleep for time interval go to standby.");
       }
@@ -926,7 +926,7 @@ void check_sleep()
     // If timeout for the robot's self shutdown exceeded. Go to stanby and sleep.
     if ((millis() - sleep_wait_before_standby_timer) >= sleep_wait_before_standby_millis && (millis() - sleep_time_timer) <= sleep_wait_before_standby_millis + 300)
     { 
-      if (power_module_status == STANDBY){
+      if (power_module_status == RUNNING){
         set_standby();
         nh.loginfo("Sleep for until charged go to standby.");
       }
