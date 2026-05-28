@@ -8,6 +8,9 @@
 #include <ros.h>
 #include <vitulus_ups/vitulus_ups.h>
 #include <vitulus_ups/power_status.h>
+
+// Set to 1 to disable all sleep commands (debug bypass). Set to 0 for normal operation.
+#define SLEEP_BYPASS 0
 #include <vitulus_ups/power_values.h>
 #include <std_msgs/Int8.h>
 #include <std_msgs/Int16.h>

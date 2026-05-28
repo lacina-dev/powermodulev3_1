@@ -146,6 +146,7 @@ void setup()
   lastmillis_pwr_button = millis();
   lastmillis_timeout = millis();
   sleep_time_timer = millis();
+  sleep_wait_before_standby_timer = millis();
   millis_play_note = millis();
 
   melody_playing = false;
@@ -900,11 +901,15 @@ void set_charge_current()
 ############################################################################*/
 void check_sleep()
 {
+#if SLEEP_BYPASS
+  // Sleep bypass active - all sleep commands ignored.
+  return;
+#endif
   // Sleep for time interval.
   if (sleep_status)
   {
     // If timeout for the robot's self shutdown exceeded. Go to stanby and sleep.
-    if ((millis() - sleep_wait_before_standby_timer) >= sleep_wait_before_standby_millis && (millis() - sleep_time_timer) <= sleep_wait_before_standby_millis + 300)
+    if ((millis() - sleep_wait_before_standby_timer) >= sleep_wait_before_standby_millis)
     {
       if (power_module_status == RUNNING){
         set_standby();
@@ -924,7 +929,7 @@ void check_sleep()
   if (sleep_charged_status)
   {
     // If timeout for the robot's self shutdown exceeded. Go to stanby and sleep.
-    if ((millis() - sleep_wait_before_standby_timer) >= sleep_wait_before_standby_millis && (millis() - sleep_time_timer) <= sleep_wait_before_standby_millis + 300)
+    if ((millis() - sleep_wait_before_standby_timer) >= sleep_wait_before_standby_millis)
     { 
       if (power_module_status == RUNNING){
         set_standby();
@@ -1424,7 +1429,9 @@ void set_robot_sleep(const std_msgs::Bool &msg)
     sleep_charged_status = false;
     sleep_time_timer = millis();
     sleep_wait_before_standby_timer = millis();
-    nh.loginfo("Sleep for time interval initiated.");
+    char dbg_sleep[80];
+    sprintf(dbg_sleep, "Sleep interval initiated. wait_before_standby=%lu ms, sleep_time=%lu ms", sleep_wait_before_standby_millis, sleep_time_millis);
+    nh.loginfo(dbg_sleep);
   }
   else
   {
@@ -1443,7 +1450,10 @@ void set_sleep_until_charged(const std_msgs::Bool &msg)
     sleep_charged_status = true;
     sleep_status = false;
     sleep_wait_before_standby_timer = millis();
-    nh.loginfo("Sleep until charged initiated.");
+    sleep_charged_timer = millis();
+    char dbg_charged[80];
+    sprintf(dbg_charged, "Sleep until charged initiated. wait_before_standby=%lu ms", sleep_wait_before_standby_millis);
+    nh.loginfo(dbg_charged);
   }
   else
   {
