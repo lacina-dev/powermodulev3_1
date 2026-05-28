@@ -181,8 +181,40 @@ void loop()
 
   tempPID.run();  // Run PID computation
   tempExtPID.run();   // Run PID computation
-  analogWrite(FAN_PWM, int(abs(outputVal))); // Write fan speed from PID.
-  analogWrite(FAN2_PWM, int(abs(outputExtTempVal))); // Write fan speed from PID.
+
+  // Fan 1 hysteresis: avoid on/off oscillation near setpoint
+  if (!fan1_enabled && temp_in >= (temp_setpoint - FAN_ON_OFFSET))
+    fan1_enabled = true;
+  if (fan1_enabled && temp_in <= (temp_setpoint - FAN_OFF_OFFSET))
+    fan1_enabled = false;
+
+  if (fan1_enabled)
+  {
+    int fan1_pwm = int(abs(outputVal));
+    if (fan1_pwm < FAN_MIN_RUN_PWM) fan1_pwm = FAN_MIN_RUN_PWM;
+    analogWrite(FAN_PWM, fan1_pwm);
+  }
+  else
+  {
+    analogWrite(FAN_PWM, 0);
+  }
+
+  // Fan 2 hysteresis: avoid on/off oscillation near setpoint
+  if (!fan2_enabled && temp_ext >= (temp_ext_setpoint - FAN_ON_OFFSET))
+    fan2_enabled = true;
+  if (fan2_enabled && temp_ext <= (temp_ext_setpoint - FAN_OFF_OFFSET))
+    fan2_enabled = false;
+
+  if (fan2_enabled)
+  {
+    int fan2_pwm = int(abs(outputExtTempVal));
+    if (fan2_pwm < FAN_MIN_RUN_PWM) fan2_pwm = FAN_MIN_RUN_PWM;
+    analogWrite(FAN2_PWM, fan2_pwm);
+  }
+  else
+  {
+    analogWrite(FAN2_PWM, 0);
+  }
 
   // 1Hz timer
   if ((millis() - lastmillis_1Hz) >= 1000)
@@ -192,6 +224,8 @@ void loop()
     fan_rpm_count = 0;
     fan2_rpm = (fan2_rpm_count / 2) * 60;
     fan2_rpm_count = 0;
+    check_fans();
+    check_thermal();
     // printData();
     rosMsgUps();
   }
@@ -571,6 +605,195 @@ void fan2RpmInt()
 }
 
 /*############################################################################
+#             Fan failure detection.
+#             Called in 1Hz timer after fan_rpm / fan2_rpm computation.
+#             Detects stopped fan when spinning is requested (PWM > threshold).
+#             Escalates to alarm if temperature is also above setpoint.
+#             Skips check if fan is intentionally disabled by hysteresis.
+############################################################################*/
+void check_fans()
+{
+  // Fan 1 (internal cooling) - only check if fan is enabled
+  if (fan1_enabled && int(abs(outputVal)) > FAN_MIN_PWM_CHECK)
+  {
+    if (fan_rpm < FAN_MIN_RPM)
+    {
+      fan_fail_count++;
+      if (fan_fail_count >= FAN_FAIL_COUNTS && !fan_fail)
+      {
+        fan_fail = true;
+        if (temp_in > temp_setpoint)
+        {
+          nh.logerror("Fan 1 failure! Temp above setpoint - overheating risk!");
+          add_melody(alarm.melody_name);
+        }
+        else
+        {
+          nh.logwarn("Fan 1 stopped spinning.");
+          add_melody(short_beep.melody_name);
+        }
+      }
+    }
+    else
+    {
+      if (fan_fail)
+      {
+        fan_fail = false;
+        nh.loginfo("Fan 1 recovered.");
+      }
+      fan_fail_count = 0;
+    }
+  }
+  else
+  {
+    fan_fail_count = 0;
+  }
+
+  // Fan 2 (external cooling) - only check if fan is enabled
+  if (fan2_enabled && int(abs(outputExtTempVal)) > FAN_MIN_PWM_CHECK)
+  {
+    if (fan2_rpm < FAN_MIN_RPM)
+    {
+      fan2_fail_count++;
+      if (fan2_fail_count >= FAN_FAIL_COUNTS && !fan2_fail)
+      {
+        fan2_fail = true;
+        if (temp_ext > temp_ext_setpoint)
+        {
+          nh.logerror("Fan 2 failure! Ext temp above setpoint - overheating risk!");
+          add_melody(alarm.melody_name);
+        }
+        else
+        {
+          nh.logwarn("Fan 2 stopped spinning.");
+          add_melody(short_beep.melody_name);
+        }
+      }
+    }
+    else
+    {
+      if (fan2_fail)
+      {
+        fan2_fail = false;
+        nh.loginfo("Fan 2 recovered.");
+      }
+      fan2_fail_count = 0;
+    }
+  }
+  else
+  {
+    fan2_fail_count = 0;
+  }
+}
+
+/*############################################################################
+#             Thermal protection.
+#             Called in 1Hz timer. Evaluates max of both NTC temperatures.
+#             Actions by state:
+#               NORMAL  -> do nothing
+#               WARNING -> reduce charge current to 50%
+#               DANGER  -> stop charging, alarm
+#               CRITICAL-> emergency shutdown
+############################################################################*/
+void check_thermal()
+{
+  // Use the higher of the two sensor readings (mapped to respective thresholds)
+  double max_temp_ratio_int = temp_in;   // compared against TEMP_* thresholds
+  double max_temp_ratio_ext = temp_ext;  // compared against TEMP_EXT_* thresholds
+
+  // Determine new thermal state from both sensors
+  int new_state = THERMAL_NORMAL;
+
+  // Check internal sensor
+  if (max_temp_ratio_int >= TEMP_CRITICAL)
+    new_state = THERMAL_CRITICAL;
+  else if (max_temp_ratio_int >= TEMP_DANGER)
+    new_state = max(new_state, THERMAL_DANGER);
+  else if (max_temp_ratio_int >= TEMP_WARNING)
+    new_state = max(new_state, THERMAL_WARNING);
+
+  // Check external sensor (can escalate further)
+  if (max_temp_ratio_ext >= TEMP_EXT_CRITICAL)
+    new_state = THERMAL_CRITICAL;
+  else if (max_temp_ratio_ext >= TEMP_EXT_DANGER)
+    new_state = max(new_state, THERMAL_DANGER);
+  else if (max_temp_ratio_ext >= TEMP_EXT_WARNING)
+    new_state = max(new_state, THERMAL_WARNING);
+
+  // Hysteresis: don't drop state unless temp falls below threshold minus hysteresis
+  if (new_state < thermal_state)
+  {
+    bool can_drop = true;
+    if (thermal_state >= THERMAL_DANGER)
+    {
+      if (max_temp_ratio_int > (TEMP_WARNING - TEMP_NORMAL_HYST) ||
+          max_temp_ratio_ext > (TEMP_EXT_WARNING - TEMP_NORMAL_HYST))
+        can_drop = false;
+    }
+    if (thermal_state >= THERMAL_WARNING)
+    {
+      if (max_temp_ratio_int > (TEMP_WARNING - TEMP_NORMAL_HYST) ||
+          max_temp_ratio_ext > (TEMP_EXT_WARNING - TEMP_NORMAL_HYST))
+      {
+        if (new_state < THERMAL_WARNING)
+          can_drop = false;
+      }
+    }
+    if (!can_drop)
+      new_state = thermal_state; // hold current state
+  }
+
+  thermal_state = new_state;
+
+  // Act on state transitions
+  if (thermal_state != last_thermal_state)
+  {
+    if (thermal_state == THERMAL_WARNING && last_thermal_state < THERMAL_WARNING)
+    {
+      nh.logwarn("THERMAL WARNING: Temperature elevated, reducing charge current.");
+      add_melody(beep_double.melody_name);
+    }
+    if (thermal_state == THERMAL_DANGER && last_thermal_state < THERMAL_DANGER)
+    {
+      nh.logerror("THERMAL DANGER: Overheating! Charging stopped.");
+      add_melody(alarm.melody_name);
+    }
+    if (thermal_state == THERMAL_CRITICAL)
+    {
+      nh.logerror("THERMAL CRITICAL: Emergency shutdown!");
+      add_melody(alarm.melody_name);
+    }
+    if (thermal_state == THERMAL_NORMAL && last_thermal_state > THERMAL_NORMAL)
+    {
+      nh.loginfo("THERMAL NORMAL: Temperature returned to safe range.");
+      thermal_charge_limited = false;
+    }
+  }
+  last_thermal_state = thermal_state;
+
+  // Apply thermal protection actions
+  switch (thermal_state)
+  {
+    case THERMAL_WARNING:
+      // Reduce charge current to 50% of setpoint
+      thermal_charge_limited = true;
+      break;
+    case THERMAL_DANGER:
+      // Stop charging entirely
+      thermal_charge_limited = true;
+      battery_charge_switch = 0;
+      break;
+    case THERMAL_CRITICAL:
+      // Emergency shutdown
+      set_shutdown();
+      break;
+    default:
+      // NORMAL - no action
+      break;
+  }
+}
+
+/*############################################################################
 #             Check the power supply status.
 ############################################################################*/
 void get_input_status()
@@ -877,6 +1100,16 @@ void set_charge_current()
     charge_current_setpoint = charge_current_setpoint_standby;
     precharge_current_setpoint = precharge_current_setpoint_standby;
   }
+  // Thermal protection: reduce charge current at WARNING state
+  if (thermal_charge_limited && thermal_state == THERMAL_WARNING)
+  {
+    charge_current_setpoint = charge_current_setpoint / 2;
+  }
+  // Thermal protection: stop charging at DANGER or CRITICAL state
+  if (thermal_state >= THERMAL_DANGER)
+  {
+    charge_current_setpoint = 0;
+  }
   // Check the limits for charge current. DO NOT CHANGE! 100 = 10A
   if (charge_current_setpoint < 0 && charge_current_setpoint > 81)
   {
@@ -1176,7 +1409,7 @@ void rosMsgPowerStatus()
   power_status_msg.sleep_time_interval = sleep_time_millis;
   power_status_msg.sleep_wait_charged = sleep_wait_charged_offset_millis;
   char buffer[80];
-  sprintf(buffer, "DEBUG INFO: %f int: %d", outputExtTempVal, int(abs(outputExtTempVal)));
+  sprintf(buffer, "thermal:%d fan1:%d fan2:%d", thermal_state, fan_fail ? 1 : 0, fan2_fail ? 1 : 0);
   power_status_msg.debug_info = buffer;
   
 

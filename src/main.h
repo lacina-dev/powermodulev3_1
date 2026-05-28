@@ -116,6 +116,14 @@ double temp_ext_setpoint = 35.0;  // target temp for cooling
 #define KP 180
 #define KI 1.6
 #define KD 30
+
+// Fan hysteresis to prevent on/off oscillation around setpoint
+#define FAN_MIN_RUN_PWM 60     // Minimum PWM duty (0-255) at which the fan reliably spins
+#define FAN_ON_OFFSET   1.0    // [°C] Turn fan on when temp >= setpoint - this offset
+#define FAN_OFF_OFFSET  4.0    // [°C] Turn fan off when temp <= setpoint - this offset
+bool fan1_enabled = true;      // Start enabled (safe default)
+bool fan2_enabled = true;
+
 int fanSpeed = 255;
 int fan_rpm = 0;
 int fan_rpm_count = 0;
@@ -124,6 +132,33 @@ double outputExtTempVal;
 int fan2Speed = 255;
 int fan2_rpm = 0;
 int fan2_rpm_count = 0;
+
+// Fan failure detection
+#define FAN_MIN_RPM 100        // [RPM] - below this threshold the fan is considered stopped
+#define FAN_MIN_PWM_CHECK 50   // Minimum PWM duty (0-255) - below this the fan may legitimately not spin
+#define FAN_FAIL_COUNTS 5      // Consecutive 1Hz cycles with zero RPM before declaring failure
+int fan_fail_count = 0;
+int fan2_fail_count = 0;
+bool fan_fail = false;
+bool fan2_fail = false;
+
+// Thermal protection thresholds
+#define TEMP_WARNING       45.0   // [°C] Internal: reduce charge current, log warning
+#define TEMP_DANGER        55.0   // [°C] Internal: stop charging, alarm
+#define TEMP_CRITICAL      65.0   // [°C] Internal: emergency shutdown
+#define TEMP_EXT_WARNING   50.0   // [°C] External: reduce charge current, log warning
+#define TEMP_EXT_DANGER    60.0   // [°C] External: stop charging, alarm
+#define TEMP_EXT_CRITICAL  70.0   // [°C] External: emergency shutdown
+#define TEMP_NORMAL_HYST    3.0   // [°C] Hysteresis to exit warning/danger states
+
+// Thermal protection state: 0=NORMAL, 1=WARNING, 2=DANGER, 3=CRITICAL
+#define THERMAL_NORMAL   0
+#define THERMAL_WARNING  1
+#define THERMAL_DANGER   2
+#define THERMAL_CRITICAL 3
+int thermal_state = THERMAL_NORMAL;
+int last_thermal_state = THERMAL_NORMAL;
+bool thermal_charge_limited = false;
 
 
 float   charge_current, 
@@ -246,6 +281,8 @@ void get_ds18b20();
 void get_pwrswitch();
 void fanRpmInt();
 void fan2RpmInt();
+void check_fans();
+void check_thermal();
 void get_input_status();
 void get_charger_status();
 void set_led();
